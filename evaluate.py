@@ -7,6 +7,7 @@ from PIL import Image
 
 from MADDPG import MADDPG
 from main import get_env
+from pettingzoo.utils.conversions import aec_to_parallel_wrapper
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -18,9 +19,14 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    model_dir = os.path.join('./results', args.env_name, args.folder)
+
+    #model_dir = os.path.join('./results', args.env_name, args.folder)
+    #model_dir criado com abspath para facilitar o uso com debugger do Pycharm.
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    model_dir = os.path.join(base_dir, 'results', args.env_name, args.folder)
     assert os.path.exists(model_dir)
     gif_dir = os.path.join(model_dir, 'gif')
+    print('GIF DIR', gif_dir)
     if not os.path.exists(gif_dir):
         os.makedirs(gif_dir)
     gif_num = len([file for file in os.listdir(gif_dir)])  # current number of gif
@@ -37,23 +43,29 @@ if __name__ == '__main__':
         frame_list = []  # used to save gif
         while env.agents:  # interact with the env for an episode
             actions = maddpg.select_action(states)
-            next_states, rewards, dones, infos = env.step(actions)
-            frame_list.append(Image.fromarray(env.render(mode='rgb_array')))
+            #next_states, rewards, dones, infos = env.step(actions)
+            next_states, rewards, dones, truncations, infos = env.step(actions)
+
+
+            render_result = env.render()
+            if render_result is not None:  # Verifique se o render não é None
+                frame_list.append(Image.fromarray(render_result))
+
             states = next_states
 
             for agent_id, reward in rewards.items():  # update reward
                 agent_reward[agent_id] += reward
 
-        env.close()
+        # Salvar o gif no final do episódio
         message = f'episode {episode + 1}, '
-        # episode finishes, record reward
-        for agent_id, reward in agent_reward.items():
+        for agent_id, reward in agent_reward.items():  # episode finishes, record reward
             episode_rewards[agent_id][episode] = reward
             message += f'{agent_id}: {reward:>4f}; '
         print(message)
         # save gif
-        frame_list[0].save(os.path.join(gif_dir, f'out{gif_num + episode + 1}.gif'),
-                           save_all=True, append_images=frame_list[1:], duration=1, loop=0)
+        if frame_list:
+            frame_list[0].save(os.path.join(gif_dir, f'out{gif_num + episode + 1}.gif'),
+                               save_all=True, append_images=frame_list[1:], duration=1, loop=0)
 
     # training finishes, plot reward
     fig, ax = plt.subplots()
@@ -67,3 +79,5 @@ if __name__ == '__main__':
     title = f'evaluate result of maddpg solve {args.env_name} {total_files - 3}'
     ax.set_title(title)
     plt.savefig(os.path.join(model_dir, title))
+
+    env.close()  # Agora chamamos o close no final, após o loop de episódios

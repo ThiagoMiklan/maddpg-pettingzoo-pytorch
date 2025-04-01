@@ -3,20 +3,28 @@ import os
 
 import matplotlib.pyplot as plt
 import numpy as np
-from pettingzoo.mpe import simple_adversary_v2, simple_spread_v2, simple_tag_v2
+from pettingzoo.mpe import simple_adversary_v3, simple_spread_v3, simple_tag_v3
 
 from MADDPG import MADDPG
+from pettingzoo.utils.conversions import aec_to_parallel_wrapper
+
 
 
 def get_env(env_name, ep_len=25):
     """create environment and get observation and action dimension of each agent in this environment"""
     new_env = None
     if env_name == 'simple_adversary_v2':
-        new_env = simple_adversary_v2.parallel_env(max_cycles=ep_len)
+        #new_env = simple_adversary_v3.parallel_env(max_cycles=ep_len, render_mode="human")
+        new_env = simple_adversary_v3.parallel_env(max_cycles=ep_len, render_mode="rgb_array")
+        #new_env = simple_adversary_v3.parallel_env(max_cycles=ep_len)
     if env_name == 'simple_spread_v2':
-        new_env = simple_spread_v2.parallel_env(max_cycles=ep_len)
+        #new_env = simple_spread_v3.parallel_env(max_cycles=ep_len, render_mode="human")
+        new_env = simple_spread_v3.parallel_env(max_cycles=ep_len, render_mode="rgb_array")
+        #new_env = simple_spread_v3.parallel_env(max_cycles=ep_len)
     if env_name == 'simple_tag_v2':
-        new_env = simple_tag_v2.parallel_env(max_cycles=ep_len)
+       #new_env = simple_tag_v3.parallel_env(max_cycles=ep_len, render_mode="human")
+       new_env = simple_tag_v3.parallel_env(max_cycles=ep_len, render_mode="rgb_array")
+       #new_env = simple_tag_v3.parallel_env(max_cycles=ep_len)
 
     new_env.reset()
     _dim_info = {}
@@ -64,7 +72,7 @@ if __name__ == '__main__':
     # reward of each episode of each agent
     episode_rewards = {agent_id: np.zeros(args.episode_num) for agent_id in env.agents}
     for episode in range(args.episode_num):
-        obs = env.reset()
+        obs = env.reset()[0]
         agent_reward = {agent_id: 0 for agent_id in env.agents}  # agent reward of the current episode
         while env.agents:  # interact with the env for an episode
             step += 1
@@ -73,11 +81,13 @@ if __name__ == '__main__':
             else:
                 action = maddpg.select_action(obs)
 
-            next_obs, reward, done, info = env.step(action)
-            # env.render()
-            maddpg.add(obs, action, reward, next_obs, done)
+            #next_obs, reward, done, info = env.step(action)
+            #env.render()
+            next_obs, rewards, terminations, truncations, infos = env.step(action)
+            #maddpg.add(obs, action, reward, next_obs, done)
+            maddpg.add(obs, action, rewards, next_obs, terminations)
 
-            for agent_id, r in reward.items():  # update reward
+            for agent_id, r in rewards.items():  # update reward
                 agent_reward[agent_id] += r
 
             if step >= args.random_steps and step % args.learn_interval == 0:  # learn every few steps

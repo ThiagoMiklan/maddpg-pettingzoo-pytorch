@@ -36,7 +36,7 @@ class MADDPG:
         self.buffers = {}
         for agent_id, (obs_dim, act_dim) in dim_info.items():
             self.agents[agent_id] = Agent(obs_dim, act_dim, global_obs_act_dim, actor_lr, critic_lr)
-            self.buffers[agent_id] = Buffer(capacity, obs_dim, act_dim, 'cpu')
+            self.buffers[agent_id] = Buffer(capacity, obs_dim, act_dim, "cuda")
         self.dim_info = dim_info
 
         self.batch_size = batch_size
@@ -44,11 +44,12 @@ class MADDPG:
         self.logger = setup_logger(os.path.join(res_dir, 'maddpg.log'))
 
     def add(self, obs, action, reward, next_obs, done):
-        # NOTE that the experience is a dict with agent name as its key
-        for agent_id in obs.keys():
+        # NOTE that the experience is a dict with agent name as its key[
+        keys = obs.keys()
+        for agent_id in keys:
             o = obs[agent_id]
             a = action[agent_id]
-            if isinstance(a, int):
+            if isinstance(a, np.integer):
                 # the action from env.action_space.sample() is int, we have to convert it to onehot
                 a = np.eye(self.dim_info[agent_id][1])[a]
 
@@ -80,6 +81,9 @@ class MADDPG:
 
     def select_action(self, obs):
         actions = {}
+        if isinstance(obs, tuple):
+            obs = obs[0]
+
         for agent, o in obs.items():
             o = torch.from_numpy(o).unsqueeze(0).float()
             a = self.agents[agent].action(o)  # torch.Size([1, action_size])
